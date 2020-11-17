@@ -386,10 +386,11 @@ class TransactionReceipt:
         # await first confirmation
         while True:
             # if sender nonce is greater than tx nonce, the tx should be confirmed
-            expect_confirmed = bool(self.sender.nonce > self.nonce)  # type: ignore
+            sender_nonce = web3.eth.getTransactionCount(str(self.sender))
+            expect_confirmed = bool(sender_nonce > self.nonce)  # type: ignore
             try:
                 receipt = web3.eth.waitForTransactionReceipt(
-                    HexBytes(self.txid), timeout=5, poll_latency=1
+                    HexBytes(self.txid), timeout=15, poll_latency=1
                 )
                 break
             except TimeExhausted:
