@@ -320,7 +320,7 @@ class TransactionReceipt:
             except TransactionNotFound:
                 if self.sender.nonce > self.nonce:  # type: ignore
                     self.status = Status(-2)
-                    print("This transaction was replaced.")
+                    self._confirmed.set()
                     return
                 time.sleep(1)
 
@@ -396,6 +396,7 @@ class TransactionReceipt:
                 if expect_confirmed:
                     # if we expected confirmation based on the nonce, tx likely dropped
                     self.status = Status(-2)
+                    self._confirmed.set()
                     return
 
         self.block_number = receipt["blockNumber"]
