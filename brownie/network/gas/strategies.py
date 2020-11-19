@@ -5,6 +5,8 @@ from typing import Dict
 import requests
 
 from .bases import BlockGasStrategy, SimpleGasStrategy
+from brownie import web3
+from brownie.exceptions import RPCRequestError
 
 _gasnow_update = 0
 _gasnow_data: Dict[str, int] = {}
@@ -93,3 +95,22 @@ class GasNowScalingStrategy(BlockGasStrategy):
 
     def get_gas_price(self) -> int:
         return _fetch_gasnow(self.initial_speed)
+
+
+class GethMempoolStrategy(BlockGasStrategy):
+    def __init__(self, position: int = 500, graphql_endpoint: str = None):
+        self.position = position
+        self.graphql_endpoint = graphql_endpoint or f"{web3.provider.endpoint_uri}/graphql"
+
+    def get_gas_price(self) -> int:
+        query = "{ pending { transactions { gasPrice }}}"
+        response = requests.post(self.graphql_endpoint, json={"query": query})
+        response.raise_for_status()
+        if "error" in response.json():
+            raise RPCRequestError("could not fetch mempool, run geth with `--graphql` flag")
+        data = response.json()["data"]["pending"]["transactions"]
+        prices = [int(x["gasPrice"], 16) for x in data]
+        return sorted(prices, reverse=True)[: self.position][-1]
+
+    def update_gas_price(self, last_gas_price: int, elapsed_blocks: int) -> int:
+        return self.get_gas_price()
