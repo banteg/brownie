@@ -98,11 +98,12 @@ class GasNowScalingStrategy(BlockGasStrategy):
 
 
 class GethMempoolStrategy(BlockGasStrategy):
-    def __init__(self, position: int = 500, graphql_endpoint: str = None):
+    def __init__(self, position: int = 500, increment: float = 1.05, graphql_endpoint: str = None):
         self.position = position
+        self.increment = increment
         self.graphql_endpoint = graphql_endpoint or f"{web3.provider.endpoint_uri}/graphql"
 
-    def get_gas_price(self) -> int:
+    def mempool_price(self) -> int:
         query = "{ pending { transactions { gasPrice }}}"
         response = requests.post(self.graphql_endpoint, json={"query": query})
         response.raise_for_status()
@@ -112,5 +113,10 @@ class GethMempoolStrategy(BlockGasStrategy):
         prices = [int(x["gasPrice"], 16) for x in data]
         return sorted(prices, reverse=True)[: self.position][-1]
 
-    def update_gas_price(self, last_gas_price: int, elapsed_blocks: int) -> int:
-        return self.get_gas_price()
+    def get_gas_price(self) -> int:
+        last = 0
+        height = web3.eth.blockNumber
+        while True:
+            elapsed_blocks = web3.eth.blockNumber - height
+            yield max(self.mempool_price(), last * self.increment ** elapsed_blocks)
+            height = web3.eth.blockNumber
